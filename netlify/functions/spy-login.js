@@ -1,18 +1,18 @@
 // netlify/functions/spy-login.js
-// Kaldes fra browseren med { username, password }
-// Returnerer et SPY API-token uden at credentials nogensinde rammer SPY direkte fra browseren
+// Autentificerer mod SPY API via API Client + API Secret
+// Token levetid: 15 minutter (SPY's specifikation)
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
-  const { username, password } = JSON.parse(event.body || '{}')
+  const { apiClient, apiSecret } = JSON.parse(event.body || '{}')
 
-  if (!username || !password) {
+  if (!apiClient || !apiSecret) {
     return {
       statusCode: 400,
-      body: JSON.stringify({ error: 'Brugernavn og adgangskode er påkrævet' })
+      body: JSON.stringify({ error: 'API Client og API Secret er påkrævet' })
     }
   }
 
@@ -22,25 +22,26 @@ exports.handler = async (event) => {
     const response = await fetch(`${SPY_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ apiClient, apiSecret })
     })
 
     if (!response.ok) {
       return {
         statusCode: 401,
-        body: JSON.stringify({ error: 'Forkert brugernavn eller adgangskode' })
+        body: JSON.stringify({ error: 'Ugyldig API Client eller API Secret' })
       }
     }
 
     const data = await response.json()
 
-    // Returner token til browseren — token udløber efter ~13 min (SPY anbefaling)
+    // Token udløber efter 15 minutter (SPY's specifikation)
+    // Vi bruger 14 minutter for at have lidt buffer
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: data.token,
-        expiresAt: Date.now() + 13 * 60 * 1000
+        expiresAt: Date.now() + 14 * 60 * 1000
       })
     }
   } catch (err) {
