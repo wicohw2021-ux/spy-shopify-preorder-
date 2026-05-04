@@ -1,14 +1,16 @@
 // src/api.js
-// Central API-klient — håndterer token-caching og alle kald til Netlify Functions
+// API-klient — håndterer token-caching og alle kald til Netlify Functions
+// Autentificering: API Client + API Secret (ikke brugernavn/password)
+// Token levetid: 15 min — vi cacher og fornyer automatisk
 
 let _token = null
 let _tokenExpiresAt = 0
 
-export async function login(username, password) {
+export async function login(apiClient, apiSecret) {
   const res = await fetch('/.netlify/functions/spy-login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ apiClient, apiSecret })
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Login fejlede')
@@ -24,7 +26,7 @@ export function logout() {
 }
 
 export function isTokenValid() {
-  return _token && Date.now() < _tokenExpiresAt - 30_000 // 30 sek buffer
+  return _token && Date.now() < _tokenExpiresAt - 30_000
 }
 
 async function authHeaders() {
@@ -35,8 +37,8 @@ async function authHeaders() {
 export async function fetchStyles({ season, search, styleNos } = {}) {
   const headers = await authHeaders()
   const params = new URLSearchParams()
-  if (season)   params.set('season', season)
-  if (search)   params.set('search', search)
+  if (season) params.set('season', season)
+  if (search) params.set('search', search)
   if (styleNos?.length) params.set('styleNos', styleNos.join(','))
 
   const res = await fetch(`/.netlify/functions/spy-styles?${params}`, { headers })
@@ -56,6 +58,5 @@ export async function generateImport(styles, season) {
     const data = await res.json()
     throw new Error(data.error || 'Eksport fejlede')
   }
-  // Returner blob til download
   return await res.blob()
 }
