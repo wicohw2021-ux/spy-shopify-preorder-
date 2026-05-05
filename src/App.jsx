@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { login, logout, fetchStyles, generateImport } from './api.js'
 
 const C = {
