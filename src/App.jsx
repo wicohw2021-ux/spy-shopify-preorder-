@@ -62,13 +62,17 @@ function Header({ activeStep, onLogout }) {
 // Bruger API Client + API Secret (ikke brugernavn/password)
 // Credentials findes i SPY: Customers → [kundekort] → Integration - API
 function LoginScreen({ onLogin }) {
-  const [apiClient, setApiClient] = useState('')
-  const [apiSecret, setApiSecret] = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState('')
+  const clientRef = useRef(null)
+  const secretRef = useRef(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
 
   async function handleSubmit(e) {
-    e.preventDefault(); setError(''); setLoading(true)
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    const apiClient = clientRef.current?.value?.trim()
+    const apiSecret = secretRef.current?.value?.trim()
     try { await login(apiClient, apiSecret); onLogin() }
     catch (err) { setError(err.message) }
     finally { setLoading(false) }
@@ -84,39 +88,31 @@ function LoginScreen({ onLogin }) {
         <h1 style={{ fontFamily:font.display, fontSize:34, fontWeight:300, color:C.ink, letterSpacing:1, marginBottom:6 }}>SPY → Shopify</h1>
         <p style={{ fontFamily:font.mono, fontSize:11, color:C.stone, letterSpacing:2 }}>PRE-ORDER IMPORTVÆRKTØJ</p>
       </div>
-
       <form onSubmit={handleSubmit} style={{ width:'100%', maxWidth:400, display:'flex', flexDirection:'column', gap:16 }}>
         <div>
           <label style={{ display:'block', fontFamily:font.mono, fontSize:10, letterSpacing:2, color:C.stone, marginBottom:7 }}>API CLIENT</label>
-          <input type="text" value={apiClient} onChange={e=>setApiClient(e.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required
+          <input ref={clientRef} type="text" autoComplete="username"
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             style={{ width:'100%', padding:'12px 14px', border:`1.5px solid ${C.dust}`, borderRadius:6, fontFamily:'monospace', fontSize:13, background:C.white, color:C.ink }} />
         </div>
         <div>
           <label style={{ display:'block', fontFamily:font.mono, fontSize:10, letterSpacing:2, color:C.stone, marginBottom:7 }}>API SECRET</label>
-          <input type="password" value={apiSecret} onChange={e=>setApiSecret(e.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required
+          <input ref={secretRef} type="password" autoComplete="current-password"
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             style={{ width:'100%', padding:'12px 14px', border:`1.5px solid ${C.dust}`, borderRadius:6, fontFamily:'monospace', fontSize:13, background:C.white, color:C.ink }} />
         </div>
-
         {error && <div style={{ padding:'10px 14px', background:C.redBg, borderRadius:6, fontFamily:font.mono, fontSize:12, color:C.red }}>⚠ {error}</div>}
-
         <button type="submit" disabled={loading}
           style={{ marginTop:4, padding:'13px', background:loading?C.stone:C.moss, color:C.white, border:'none', borderRadius:6, fontFamily:font.mono, fontSize:12, letterSpacing:2, cursor:loading?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
           {loading ? <><Spinner /> FORBINDER…</> : 'LOG IND MED SPY →'}
         </button>
       </form>
-
       <div style={{ marginTop:32, padding:'14px 18px', background:C.white, border:`1px solid ${C.dust}`, borderRadius:6, maxWidth:400, width:'100%' }}>
         <p style={{ fontFamily:font.mono, fontSize:10, color:C.stone, letterSpacing:1, marginBottom:6 }}>HVOR FINDER DU DINE NØGLER?</p>
         <p style={{ fontFamily:font.sans, fontSize:12, color:C.stone, lineHeight:1.6 }}>
           SPY Admin → Customers → [kundekort] → Integration - API fanen → API Client + API Secret
         </p>
       </div>
-
-      <p style={{ marginTop:24, fontFamily:font.mono, fontSize:10, color:C.dust, letterSpacing:1, maxWidth:400, textAlign:'center' }}>
-        Nøglerne sendes aldrig direkte til SPY — al kommunikation sker via sikker serverside-funktion.
-      </p>
     </div>
   )
 }
