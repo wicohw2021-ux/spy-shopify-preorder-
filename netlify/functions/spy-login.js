@@ -10,7 +10,7 @@ exports.handler = async (event) => {
     const res = await fetch(`${SPY_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: apiClient, clientSecret: apiSecret }),
+      body: JSON.stringify({ client_id: apiClient, client_secret: apiSecret }),
       signal: AbortSignal.timeout(8000)
     })
     const text = await res.text()
