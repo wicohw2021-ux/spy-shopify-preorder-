@@ -16,9 +16,10 @@ exports.handler = async (event) => {
     params.set('detailed', 'true')
     if (search) params.set('search', search)
 
+    // SPY V1 bruger apiKey header — ikke Bearer
     const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'apiKey': token,
         'Accept': 'application/json'
       },
       signal: AbortSignal.timeout(8000)
@@ -31,7 +32,7 @@ exports.handler = async (event) => {
       return { statusCode: 401, body: JSON.stringify({ error: 'Token udløbet — log ind igen' }) }
     }
     if (!res.ok) {
-      return { statusCode: 502, body: JSON.stringify({ error: 'SPY API fejl' }) }
+      return { statusCode: 502, body: JSON.stringify({ error: 'SPY API fejl: ' + res.status }) }
     }
 
     const data = JSON.parse(text)
@@ -55,8 +56,6 @@ exports.handler = async (event) => {
           prices: {
             dkk_rrp: d.price || null,
             dkk_wsp: d.wspPrice || null,
-            sek_rrp: null,
-            eur_rrp: null,
           }
         }
       }
@@ -72,6 +71,6 @@ exports.handler = async (event) => {
     }
   } catch (err) {
     console.log('FEJL:', err.message)
-    return { statusCode: 502, body: JSON.stringify({ error: 'Netværksfejl mod SPY API' }) }
+    return { statusCode: 502, body: JSON.stringify({ error: 'Netværksfejl: ' + err.message }) }
   }
 }
