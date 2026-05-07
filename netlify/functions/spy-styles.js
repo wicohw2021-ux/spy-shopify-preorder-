@@ -1,6 +1,3 @@
-// netlify/functions/spy-styles.js
-// Henter styles fra SPY Produkt-API med token + valgfri filtrering på sæson/søgeterm
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
@@ -11,62 +8,70 @@ exports.handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Manglende token' }) }
   }
 
-  const { season, search, styleNos } = event.queryStringParameters || {}
-  const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://api.spysystem.dk'
+  const { search } = event.queryStringParameters || {}
+  const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
 
   try {
-    // Byg query-parametre til SPY's Produkt-API
     const params = new URLSearchParams()
-    if (season)   params.set('season', season)
-    if (search)   params.set('search', search)
-    if (styleNos) params.set('styleNos', styleNos) // kommasepareret liste
+    params.set('detailed', 'true')
+    if (search) params.set('search', search)
 
-    const stylesRes = await fetch(
-      `${SPY_BASE_URL}/v2/styles?${params.toString()}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
+    const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      },
+      signal: AbortSignal.timeout(8000)
+    })
 
-    if (stylesRes.status === 401) {
+    const text = await res.text()
+    console.log('STATUS:', res.status, '| SVAR:', text.slice(0, 300))
+
+    if (res.status === 401) {
       return { statusCode: 401, body: JSON.stringify({ error: 'Token udløbet — log ind igen' }) }
     }
-    if (!stylesRes.ok) {
-      return { statusCode: 502, body: JSON.stringify({ error: 'SPY API fejl ved hentning af styles' }) }
+    if (!res.ok) {
+      return { statusCode: 502, body: JSON.stringify({ error: 'SPY API fejl' }) }
     }
 
-    const styles = await stylesRes.json()
+    const data = JSON.parse(text)
 
-    // Hent prisliste parallelt
-    const pricesRes = await fetch(
-      `${SPY_BASE_URL}/v2/pricelists?season=${season || ''}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-    const prices = pricesRes.ok ? await pricesRes.json() : []
-
-    // Merge priser ind på styles
-    const priceMap = {}
-    for (const p of prices) {
-      priceMap[p.styleNo] = {
-        dkk_wsp: p.wsp_dkk,
-        dkk_rrp: p.rrp_dkk,
-        sek_wsp: p.wsp_sek,
-        sek_rrp: p.rrp_sek,
-        eur_wsp: p.wsp_eur,
-        eur_rrp: p.rrp_eur,
+    // Gruppér varianter per style+farve → ét produkt per farve
+    const productMap = {}
+    for (const variant of (data.data?.variants || [])) {
+      const d = variant.details
+      const key = `${d.styleNo}__${d.colorName}`
+      if (!productMap[key]) {
+        productMap[key] = {
+          styleNo: d.styleNo,
+          name: d.styleNameWebshop || d.styleName,
+          styleNameWebshop: d.styleNameWebshop || d.styleName,
+          type: d.type || d.category || '',
+          colors: [d.colorName],
+          sizes: [],
+          images: d.images || [],
+          styleDescription: d.styleDescription || '',
+          brandName: d.brandName || '',
+          prices: {
+            dkk_rrp: d.price || null,
+            dkk_wsp: d.wspPrice || null,
+            sek_rrp: null,
+            eur_rrp: null,
+          }
+        }
+      }
+      if (d.size && !productMap[key].sizes.includes(d.size)) {
+        productMap[key].sizes.push(d.size)
       }
     }
-
-    const enriched = styles.map(s => ({
-      ...s,
-      prices: priceMap[s.styleNo] || null
-    }))
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(enriched)
+      body: JSON.stringify(Object.values(productMap))
     }
   } catch (err) {
-    console.error('SPY styles fejl:', err)
+    console.log('FEJL:', err.message)
     return { statusCode: 502, body: JSON.stringify({ error: 'Netværksfejl mod SPY API' }) }
   }
 }
