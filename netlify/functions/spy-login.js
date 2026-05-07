@@ -3,6 +3,7 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
+  console.log('RAW BODY:', event.body)
   const { apiClient, apiSecret } = JSON.parse(event.body || '{}')
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
 
