@@ -3,19 +3,14 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
-  console.log('RAW BODY:', event.body)
   const { apiClient, apiSecret } = JSON.parse(event.body || '{}')
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
 
-  // Prøv query string i stedet for JSON body
-  const url = `${SPY_BASE_URL}/auth/login?client_id=${encodeURIComponent(apiClient)}&client_secret=${encodeURIComponent(apiSecret)}`
-  console.log('Kalder URL:', url.replace(apiSecret, '***'))
-
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${SPY_BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(8000)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientID: apiClient, clientSecret: apiSecret })
     })
     const text = await res.text()
     console.log('STATUS:', res.status, '| SVAR:', text.slice(0, 300))
