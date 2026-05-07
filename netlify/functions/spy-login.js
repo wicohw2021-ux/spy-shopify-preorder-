@@ -6,28 +6,24 @@ exports.handler = async (event) => {
   const { apiClient, apiSecret } = JSON.parse(event.body || '{}')
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
 
-  const credentials = Buffer.from(`${apiClient}:${apiSecret}`).toString('base64')
-
   try {
-    const res = await fetch(`${SPY_BASE_URL}/variants`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Accept': 'application/json'
-      },
+    const res = await fetch(`${SPY_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: apiClient, clientSecret: apiSecret }),
       signal: AbortSignal.timeout(8000)
     })
     const text = await res.text()
-    console.log('STATUS:', res.status, '| SVAR:', text.slice(0, 200))
+    console.log('STATUS:', res.status, '| SVAR:', text.slice(0, 300))
 
-    if (res.ok) {
+    let data
+    try { data = JSON.parse(text) } catch(e) {}
+    const token = data?.token || data?.data?.token || data?.apiKey
+    if (res.ok && token) {
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: credentials,
-          expiresAt: Date.now() + 60 * 60 * 1000
-        })
+        body: JSON.stringify({ token, expiresAt: Date.now() + 13 * 60 * 1000 })
       }
     }
     return { statusCode: 401, body: JSON.stringify({ error: 'Ugyldig API Client eller API Secret' }) }
