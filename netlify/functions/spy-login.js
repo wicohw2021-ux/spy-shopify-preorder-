@@ -7,11 +7,14 @@ exports.handler = async (event) => {
   const { apiClient, apiSecret } = JSON.parse(event.body || '{}')
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
 
+  // Prøv query string i stedet for JSON body
+  const url = `${SPY_BASE_URL}/auth/login?client_id=${encodeURIComponent(apiClient)}&client_secret=${encodeURIComponent(apiSecret)}`
+  console.log('Kalder URL:', url.replace(apiSecret, '***'))
+
   try {
-    const res = await fetch(`${SPY_BASE_URL}/auth/login`, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: apiClient, client_secret: apiSecret }),
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       signal: AbortSignal.timeout(8000)
     })
     const text = await res.text()
