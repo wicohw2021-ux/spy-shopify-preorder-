@@ -13,11 +13,15 @@ exports.handler = async (event) => {
       body: JSON.stringify({ clientID: apiClient, clientSecret: apiSecret })
     })
     const text = await res.text()
-    console.log('STATUS:', res.status, '| SVAR:', text.slice(0, 300))
+    console.log('LOGIN SVAR:', text.slice(0, 500))
 
     let data
     try { data = JSON.parse(text) } catch(e) {}
+    console.log('DATA KEYS:', Object.keys(data || {}))
+
     const token = data?.token || data?.data?.token || data?.apiKey
+    console.log('TOKEN FUNDET:', token ? token.slice(0, 30) + '...' : 'INGEN')
+
     if (res.ok && token) {
       return {
         statusCode: 200,
@@ -28,6 +32,6 @@ exports.handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Ugyldig API Client eller API Secret' }) }
   } catch (err) {
     console.log('FEJL:', err.message)
-    return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke forbinde til SPY API' }) }
+    return { statusCode: 502, body: JSON.stringify({ error: err.message }) }
   }
 }
