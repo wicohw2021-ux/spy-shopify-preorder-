@@ -8,15 +8,10 @@ exports.handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Manglende token' }) }
   }
 
-  const { search } = event.queryStringParameters || {}
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
 
-  const url = `${SPY_BASE_URL}/variants/stock?detailed=true${search ? '&search=' + encodeURIComponent(search) : ''}`
-  console.log('URL:', url)
-  console.log('TOKEN (første 20 tegn):', token?.slice(0, 20))
-
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${SPY_BASE_URL}/variants/stock?page=1&limit=1`, {
       headers: {
         'apiKey': token,
         'Accept': 'application/json'
@@ -27,7 +22,7 @@ exports.handler = async (event) => {
     const text = await res.text()
     console.log('SVAR:', text.slice(0, 400))
     return {
-      statusCode: res.status,
+      statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: text
     }
