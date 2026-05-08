@@ -11,16 +11,9 @@ exports.handler = async (event) => {
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
   const { search, brand } = event.queryStringParameters || {}
   const headers = { 'X-Spy-Authorization': token, 'Accept': 'application/json' }
+  const targetBrand = brand || 'NOTYZ'
 
   try {
-    // Hent brands
-    const brandsRes = await fetch(`${SPY_BASE_URL}/brands`, { headers })
-    const brandsData = await brandsRes.json()
-    const brands = (brandsData?.data?.brands || []).map(b => b.brandName)
-
-    // Hent kun ét brand ad gangen — send brand som parameter fra appen
-    const targetBrand = brand || brands[0]
-
     const params = new URLSearchParams()
     params.set('brandName', targetBrand)
     params.set('page', '1')
@@ -32,7 +25,6 @@ exports.handler = async (event) => {
     const data = await res.json()
     const variants = data?.data?.variants || []
 
-    // Gruppér per style+farve
     const productMap = {}
     for (const variant of variants) {
       const d = variant.details
@@ -59,10 +51,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Available-Brands': JSON.stringify(brands)
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.values(productMap))
     }
   } catch (err) {
