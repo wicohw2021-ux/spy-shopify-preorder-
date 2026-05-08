@@ -9,41 +9,32 @@ exports.handler = async (event) => {
   }
 
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
-  const { search } = event.queryStringParameters || {}
+  const { search, brand } = event.queryStringParameters || {}
   const headers = { 'X-Spy-Authorization': token, 'Accept': 'application/json' }
 
   try {
-    // Hent alle brands dynamisk
+    // Hent brands
     const brandsRes = await fetch(`${SPY_BASE_URL}/brands`, { headers })
     const brandsData = await brandsRes.json()
     const brands = (brandsData?.data?.brands || []).map(b => b.brandName)
 
-    if (brands.length === 0) {
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' }
-    }
+    // Hent kun ét brand ad gangen — send brand som parameter fra appen
+    const targetBrand = brand || brands[0]
 
-    // Hent varianter for alle brands
-    const allVariants = []
-    for (const brand of brands) {
-      const params = new URLSearchParams()
-      params.set('brandName', brand)
-      params.set('page', '1')
-      params.set('limit', '250')
-      params.set('detailed', 'true')
-      if (search) params.set('search', search)
+    const params = new URLSearchParams()
+    params.set('brandName', targetBrand)
+    params.set('page', '1')
+    params.set('limit', '250')
+    params.set('detailed', 'true')
+    if (search) params.set('search', search)
 
-      const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, { headers })
-      if (res.ok) {
-        const data = await res.json()
-        allVariants.push(...(data?.data?.variants || []))
-      }
-      // Respekter rate limit
-      await new Promise(r => setTimeout(r, 500))
-    }
+    const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, { headers })
+    const data = await res.json()
+    const variants = data?.data?.variants || []
 
-    // Gruppér per style+farve — ét produkt per farve
+    // Gruppér per style+farve
     const productMap = {}
-    for (const variant of allVariants) {
+    for (const variant of variants) {
       const d = variant.details
       if (!d) continue
       const key = `${d.styleNo}__${d.colorName}`
@@ -58,10 +49,7 @@ exports.handler = async (event) => {
           images: d.images || [],
           styleDescription: d.styleDescription || '',
           brandName: d.brandName || '',
-          prices: {
-            dkk_rrp: d.price || null,
-            dkk_wsp: d.wspPrice || null
-          }
+          prices: { dkk_rrp: d.price || null, dkk_wsp: d.wspPrice || null }
         }
       }
       if (d.size && !productMap[key].sizes.includes(d.size)) {
@@ -71,7 +59,10 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Available-Brands': JSON.stringify(brands)
+      },
       body: JSON.stringify(Object.values(productMap))
     }
   } catch (err) {
