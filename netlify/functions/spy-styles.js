@@ -9,9 +9,9 @@ exports.handler = async (event) => {
   }
 
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
-  const { search, brand } = event.queryStringParameters || {}
+  const { search, brand, season } = event.queryStringParameters || {}
   const headers = { 'X-Spy-Authorization': token, 'Accept': 'application/json' }
-  const targetBrand = brand || 'NOTYZ'
+  const targetBrand = brand || 'Orchid'
 
   try {
     const params = new URLSearchParams()
@@ -19,9 +19,12 @@ exports.handler = async (event) => {
     params.set('page', '1')
     params.set('limit', '250')
     params.set('detailed', 'true')
+    if (season) params.set('seasonName', season)
     if (search) params.set('search', search)
 
-    const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, { headers })
+    // Brug /variants/season i stedet for /variants/stock
+    // da pre-order varer ikke har lager endnu
+    const res = await fetch(`${SPY_BASE_URL}/variants/season?${params}`, { headers })
     const data = await res.json()
     const variants = data?.data?.variants || []
 
