@@ -1,30 +1,53 @@
-export const handler = async (event) => {
-  const token = event.headers['authorization']?.replace('Bearer ', '')
-  const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
-
+exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
+  const token = event.headers['authorization']?.replace('Bearer ', '')
+
   if (!token) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Manglende token', debug: 'ingen token i header' }) }
+    return { 
+      statusCode: 401, 
+      body: JSON.stringify({ error: 'Manglende token' }) 
+    }
   }
 
+  const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
+  const { search } = event.queryStringParameters || {}
+
   try {
-    const res = await fetch(`${SPY_BASE_URL}/variants/stock?page=1&limit=1`, {
-      headers: { 'apiKey': token, 'Accept': 'application/json' }
+    const params = new URLSearchParams()
+    params.set('page', '1')
+    params.set('limit', '10')
+    if (search) params.set('search', search)
+
+    const url = `${SPY_BASE_URL}/variants/stock?${params.toString()}`
+
+    const res = await fetch(url, {
+      headers: {
+        'apiKey': token,
+        'Accept': 'application/json'
+      }
     })
+
     const text = await res.text()
+    
+    if (!res.ok) {
+      return { 
+        statusCode: res.status, 
+        body: JSON.stringify({ error: 'SPY fejl: ' + res.status + ' ' + text.slice(0, 100) }) 
+      }
+    }
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ debug: true, status: res.status, url: SPY_BASE_URL, svar: text.slice(0, 500) })
+      body: text
     }
   } catch (err) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ debug: true, fejl: err.message, stack: err.stack?.slice(0, 200) })
+    return { 
+      statusCode: 502, 
+      body: JSON.stringify({ error: err.message }) 
     }
   }
 }
