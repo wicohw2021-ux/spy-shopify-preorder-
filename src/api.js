@@ -1,8 +1,3 @@
-// src/api.js
-// API-klient — håndterer token-caching og alle kald til Netlify Functions
-// Autentificering: API Client + API Secret (ikke brugernavn/password)
-// Token levetid: 15 min — vi cacher og fornyer automatisk
-
 let _token = null
 let _tokenExpiresAt = 0
 
@@ -14,7 +9,6 @@ export async function login(apiClient, apiSecret) {
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Login fejlede')
-
   _token = data.token
   _tokenExpiresAt = data.expiresAt
   return data
@@ -34,17 +28,17 @@ async function authHeaders() {
   return { Authorization: `Bearer ${_token}` }
 }
 
-export async function fetchStyles({ season, search, styleNos } = {}) {
+export async function fetchStyles({ season, search } = {}) {
   const headers = await authHeaders()
   const params = new URLSearchParams()
   if (season) params.set('season', season)
   if (search) params.set('search', search)
-  if (styleNos?.length) params.set('styleNos', styleNos.join(','))
 
   const res = await fetch(`/.netlify/functions/spy-styles?${params}`, { headers })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Kunne ikke hente styles')
-  return data
+  // Sikr at vi altid returnerer et array
+  return Array.isArray(data) ? data : []
 }
 
 export async function generateImport(styles, season) {
