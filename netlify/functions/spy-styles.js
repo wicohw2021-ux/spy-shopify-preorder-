@@ -9,54 +9,67 @@ exports.handler = async (event) => {
   }
 
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
-  const { search, brand, season } = event.queryStringParameters || {}
+  const { styleNos, season } = event.queryStringParameters || {}
   const headers = { 'X-Spy-Authorization': token, 'Accept': 'application/json' }
-  const targetBrand = brand || 'Orchid'
+
+  if (!styleNos) {
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' }
+  }
+
+  // Konvertér sæson fra AW26 → 26 Autumn
+  function convertSeason(s) {
+    if (!s) return '26 Autumn'
+    const match = s.match(/^(AW|SS)(\d{2})$/)
+    if (!match) return s
+    return `${match[2]} ${match[1] === 'AW' ? 'Autumn' : 'Spring'}`
+  }
+
+  const targetSeason = convertSeason(season)
+  const styleNoList = styleNos.split(',').map(s => s.trim()).filter(Boolean)
+  const BRANDS = ['BTFCPH', 'NO. 1 BY OX', 'NOTYZ', 'Orchid']
 
   try {
-    // Hvis ingen sæson angivet — hent sæsonliste og returner den
-    if (!season) {
-      const seasonsRes = await fetch(`${SPY_BASE_URL}/seasons?brandName=${encodeURIComponent(targetBrand)}`, { headers })
-      const seasonsData = await seasonsRes.json()
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seasons: seasonsData?.data?.seasons || [], brand: targetBrand })
-      }
-    }
-
-    // Hent varianter for specifik sæson
-    const params = new URLSearchParams()
-    params.set('brandName', targetBrand)
-    params.set('seasonName', season)
-    params.set('detailed', 'true')
-    if (search) params.set('styleNo', search)
-
-    const res = await fetch(`${SPY_BASE_URL}/variants/season?${params}`, { headers })
-    const data = await res.json()
-    const variants = data?.data?.variants || []
-
     const productMap = {}
-    for (const variant of variants) {
-      const d = variant.details
-      if (!d) continue
-      const key = `${d.styleNo}__${d.colorName}`
-      if (!productMap[key]) {
-        productMap[key] = {
-          styleNo: d.styleNo,
-          name: d.styleNameWebshop || d.styleName,
-          styleNameWebshop: d.styleNameWebshop || d.styleName,
-          type: d.type || d.category || '',
-          colors: [d.colorName],
-          sizes: [],
-          images: d.images || [],
-          styleDescription: d.styleDescription || '',
-          brandName: d.brandName || '',
-          prices: { dkk_rrp: d.price || null, dkk_wsp: d.wspPrice || null }
+
+    for (const styleNo of styleNoList) {
+      for (const brand of BRANDS) {
+        const params = new URLSearchParams()
+        params.set('brandName', brand)
+        params.set('seasonName', targetSeason)
+        params.set('styleNo', styleNo)
+        params.set('detailed', 'true')
+
+        const res = await fetch(`${SPY_BASE_URL}/variants/season?${params}`, { headers })
+        if (!res.ok) continue
+
+        const data = await res.json()
+        const variants = data?.data?.variants || []
+        if (variants.length === 0) continue
+
+        for (const variant of variants) {
+          const d = variant.details
+          if (!d) continue
+          const key = `${d.styleNo}__${d.colorName}`
+          if (!productMap[key]) {
+            productMap[key] = {
+              styleNo: d.styleNo,
+              name: d.styleNameWebshop || d.styleName,
+              styleNameWebshop: d.styleNameWebshop || d.styleName,
+              type: d.type || d.category || '',
+              colors: [d.colorName],
+              sizes: [],
+              images: d.images || [],
+              styleDescription: d.styleDescription || '',
+              brandName: d.brandName || '',
+              prices: { dkk_rrp: d.price || null, dkk_wsp: d.wspPrice || null }
+            }
+          }
+          if (d.size && !productMap[key].sizes.includes(d.size)) {
+            productMap[key].sizes.push(d.size)
+          }
         }
-      }
-      if (d.size && !productMap[key].sizes.includes(d.size)) {
-        productMap[key].sizes.push(d.size)
+        // Stop ved første brand der matcher
+        if (Object.keys(productMap).length > 0) break
       }
     }
 
