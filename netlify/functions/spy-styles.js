@@ -10,31 +10,38 @@ exports.handler = async (event) => {
 
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
   const { search } = event.queryStringParameters || {}
-  const BRANDS = ['BTFCPH', 'NO. 1 BY OX', 'NOTYZ', 'Orchid']
+  const headers = { 'X-Spy-Authorization': token, 'Accept': 'application/json' }
 
   try {
-    const allVariants = []
+    // Hent alle brands dynamisk
+    const brandsRes = await fetch(`${SPY_BASE_URL}/brands`, { headers })
+    const brandsData = await brandsRes.json()
+    const brands = (brandsData?.data?.brands || []).map(b => b.brandName)
 
-    for (const brand of BRANDS) {
+    if (brands.length === 0) {
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: '[]' }
+    }
+
+    // Hent varianter for alle brands
+    const allVariants = []
+    for (const brand of brands) {
       const params = new URLSearchParams()
       params.set('brandName', brand)
       params.set('page', '1')
-      params.set('limit', '50')
+      params.set('limit', '250')
       params.set('detailed', 'true')
       if (search) params.set('search', search)
 
-      const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, {
-        headers: { 'X-Spy-Authorization': token, 'Accept': 'application/json' }
-      })
-
+      const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, { headers })
       if (res.ok) {
         const data = await res.json()
-        const variants = data?.data?.variants || []
-        allVariants.push(...variants)
+        allVariants.push(...(data?.data?.variants || []))
       }
+      // Respekter rate limit
+      await new Promise(r => setTimeout(r, 500))
     }
 
-    // Gruppér per style+farve
+    // Gruppér per style+farve — ét produkt per farve
     const productMap = {}
     for (const variant of allVariants) {
       const d = variant.details
@@ -51,7 +58,10 @@ exports.handler = async (event) => {
           images: d.images || [],
           styleDescription: d.styleDescription || '',
           brandName: d.brandName || '',
-          prices: { dkk_rrp: d.price || null, dkk_wsp: d.wspPrice || null }
+          prices: {
+            dkk_rrp: d.price || null,
+            dkk_wsp: d.wspPrice || null
+          }
         }
       }
       if (d.size && !productMap[key].sizes.includes(d.size)) {
