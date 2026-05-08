@@ -9,30 +9,20 @@ exports.handler = async (event) => {
   }
 
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
-  const { search } = event.queryStringParameters || {}
 
   try {
-    const params = new URLSearchParams()
-    params.set('page', '1')
-    params.set('limit', '10')
-    if (search) params.set('search', search)
-
-    const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, {
+    const res = await fetch(`${SPY_BASE_URL}/variants/stock?page=1&limit=5&detailed=true`, {
       headers: {
         'X-Spy-Authorization': token,
         'Accept': 'application/json'
       }
     })
-
     const text = await res.text()
-    if (!res.ok) {
-      return { statusCode: res.status, body: JSON.stringify({ error: 'SPY fejl: ' + res.status }) }
-    }
-
+    // Returner det fulde svar inkl. fejlbesked fra SPY
     return {
-      statusCode: 200,
+      statusCode: res.ok ? 200 : res.status,
       headers: { 'Content-Type': 'application/json' },
-      body: text
+      body: res.ok ? text : JSON.stringify({ error: 'SPY fejl: ' + res.status, details: text.slice(0, 300) })
     }
   } catch (err) {
     return { statusCode: 502, body: JSON.stringify({ error: err.message }) }
