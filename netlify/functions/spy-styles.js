@@ -14,16 +14,24 @@ exports.handler = async (event) => {
   const targetBrand = brand || 'Orchid'
 
   try {
+    // Hvis ingen sæson angivet — hent sæsonliste og returner den
+    if (!season) {
+      const seasonsRes = await fetch(`${SPY_BASE_URL}/seasons?brandName=${encodeURIComponent(targetBrand)}`, { headers })
+      const seasonsData = await seasonsRes.json()
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seasons: seasonsData?.data?.seasons || [], brand: targetBrand })
+      }
+    }
+
+    // Hent varianter for specifik sæson
     const params = new URLSearchParams()
     params.set('brandName', targetBrand)
-    params.set('page', '1')
-    params.set('limit', '250')
+    params.set('seasonName', season)
     params.set('detailed', 'true')
-    if (season) params.set('seasonName', season)
-    if (search) params.set('search', search)
+    if (search) params.set('styleNo', search)
 
-    // Brug /variants/season i stedet for /variants/stock
-    // da pre-order varer ikke har lager endnu
     const res = await fetch(`${SPY_BASE_URL}/variants/season?${params}`, { headers })
     const data = await res.json()
     const variants = data?.data?.variants || []
