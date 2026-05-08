@@ -1,6 +1,4 @@
-const https = require('https')
-
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
@@ -14,39 +12,24 @@ exports.handler = async (event) => {
 
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
 
-  return new Promise((resolve) => {
-    const url = new URL(`${SPY_BASE_URL}/variants/stock?page=1&limit=1`)
-    const options = {
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      method: 'GET',
+  try {
+    console.log('Starter fetch...')
+    const res = await fetch(`${SPY_BASE_URL}/variants/stock?page=1&limit=1`, {
       headers: {
         'apiKey': token,
         'Accept': 'application/json'
       }
+    })
+    console.log('STATUS:', res.status)
+    const text = await res.text()
+    console.log('SVAR:', text.slice(0, 300))
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: text
     }
-
-    console.log('Kalder:', url.toString())
-
-    const req = https.request(options, (res) => {
-      let data = ''
-      res.on('data', chunk => data += chunk)
-      res.on('end', () => {
-        console.log('STATUS:', res.statusCode)
-        console.log('SVAR:', data.slice(0, 300))
-        resolve({
-          statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
-          body: data
-        })
-      })
-    })
-
-    req.on('error', (err) => {
-      console.log('FEJL:', err.message)
-      resolve({ statusCode: 502, body: JSON.stringify({ error: err.message }) })
-    })
-
-    req.end()
-  })
+  } catch (err) {
+    console.log('FEJL:', err.message)
+    return { statusCode: 502, body: JSON.stringify({ error: err.message }) }
+  }
 }
