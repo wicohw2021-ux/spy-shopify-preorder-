@@ -4,12 +4,8 @@ exports.handler = async (event) => {
   }
 
   const token = event.headers['authorization']?.replace('Bearer ', '')
-
   if (!token) {
-    return { 
-      statusCode: 401, 
-      body: JSON.stringify({ error: 'Manglende token' }) 
-    }
+    return { statusCode: 401, body: JSON.stringify({ error: 'Manglende token' }) }
   }
 
   const SPY_BASE_URL = process.env.SPY_BASE_URL || 'https://denasia.spysystem.dk/api/v1'
@@ -21,22 +17,16 @@ exports.handler = async (event) => {
     params.set('limit', '10')
     if (search) params.set('search', search)
 
-    const url = `${SPY_BASE_URL}/variants/stock?${params.toString()}`
-
-    const res = await fetch(url, {
+    const res = await fetch(`${SPY_BASE_URL}/variants/stock?${params}`, {
       headers: {
-        'apiKey': token,
+        'X-Spy-Authorization': token,
         'Accept': 'application/json'
       }
     })
 
     const text = await res.text()
-    
     if (!res.ok) {
-      return { 
-        statusCode: res.status, 
-        body: JSON.stringify({ error: 'SPY fejl: ' + res.status + ' ' + text.slice(0, 100) }) 
-      }
+      return { statusCode: res.status, body: JSON.stringify({ error: 'SPY fejl: ' + res.status }) }
     }
 
     return {
@@ -45,9 +35,6 @@ exports.handler = async (event) => {
       body: text
     }
   } catch (err) {
-    return { 
-      statusCode: 502, 
-      body: JSON.stringify({ error: err.message }) 
-    }
+    return { statusCode: 502, body: JSON.stringify({ error: err.message }) }
   }
 }
